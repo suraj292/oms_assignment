@@ -1,9 +1,14 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import type { User } from '@/types/auth'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('auth_token'))
-  const user = ref<any>(null)
+  const user = ref<User | null>(null)
+
+  const isAuthenticated = computed(() => !!token.value)
+  const isAdmin = computed(() => user.value?.role === 'Admin')
+  const isStaff = computed(() => user.value?.role === 'Staff')
 
   function setToken(newToken: string) {
     token.value = newToken
@@ -15,7 +20,7 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('auth_token')
   }
 
-  function setUser(userData: any) {
+  function setUser(userData: User) {
     user.value = userData
   }
 
@@ -27,6 +32,9 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     token,
     user,
+    isAuthenticated,
+    isAdmin,
+    isStaff,
     setToken,
     clearToken,
     setUser,
