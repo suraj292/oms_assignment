@@ -45,6 +45,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/customers', [App\Http\Controllers\Api\CustomerController::class, 'store']);
         Route::put('/customers/{customer}', [App\Http\Controllers\Api\CustomerController::class, 'update']);
         Route::delete('/customers/{customer}', [App\Http\Controllers\Api\CustomerController::class, 'destroy']);
+
+        // Orders - Admin can delete draft orders
+        Route::delete('/orders/{order}', [App\Http\Controllers\Api\OrderController::class, 'destroy']);
     });
 
     // Admin and Staff routes
@@ -56,5 +59,12 @@ Route::middleware('auth:sanctum')->group(function () {
         // Customers - Both can view
         Route::get('/customers', [App\Http\Controllers\Api\CustomerController::class, 'index']);
         Route::get('/customers/{customer}', [App\Http\Controllers\Api\CustomerController::class, 'show']);
+
+        // Orders - Both can create, view, and update
+        Route::get('/orders', [App\Http\Controllers\Api\OrderController::class, 'index']);
+        Route::post('/orders', [App\Http\Controllers\Api\OrderController::class, 'store']);
+        Route::get('/orders/{order}', [App\Http\Controllers\Api\OrderController::class, 'show']);
+        Route::put('/orders/{order}', [App\Http\Controllers\Api\OrderController::class, 'update']);
+        Route::patch('/orders/{order}/status', [App\Http\Controllers\Api\OrderController::class, 'updateStatus']);
     });
 });

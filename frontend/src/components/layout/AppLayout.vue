@@ -12,6 +12,7 @@
           <nav v-if="authStore.isAuthenticated" class="main-nav">
             <router-link to="/products" class="nav-item">Products</router-link>
             <router-link to="/customers" class="nav-item">Customers</router-link>
+            <router-link to="/orders" class="nav-item">Orders</router-link>
           </nav>
         </div>
 

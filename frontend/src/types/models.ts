@@ -55,3 +55,46 @@ export interface PaginatedResponse<T> {
     }
     meta: PaginationMeta
 }
+
+export type OrderStatus = 'draft' | 'confirmed' | 'processing' | 'dispatched' | 'delivered' | 'cancelled'
+
+export interface OrderStatusOption {
+  value: OrderStatus
+  label: string
+}
+
+export interface OrderItem {
+  id?: number
+  product_id: number
+  product_name: string
+  price: string
+  quantity: number
+  subtotal: string
+}
+
+export interface Order {
+  id: number
+  order_number: string
+  customer_id: number
+  customer?: Customer
+  status: OrderStatus
+  status_label: string
+  total: string
+  notes: string | null
+  items: OrderItem[]
+  items_count: number
+  is_editable: boolean
+  is_final: boolean
+  allowed_next_statuses: OrderStatusOption[]
+  created_at: string
+  updated_at: string
+}
+
+export interface OrderFormData {
+  customer_id: number | string
+  notes?: string
+  items: Array<{
+    product_id: number | string
+    quantity: number | string
+  }>
+}

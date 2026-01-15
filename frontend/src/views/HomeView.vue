@@ -61,6 +61,14 @@
                 <div class="action-description">Customer database</div>
               </div>
             </router-link>
+
+            <router-link to="/orders" class="action-link">
+              <span class="action-icon">📋</span>
+              <div>
+                <div class="action-title">Orders</div>
+                <div class="action-description">Manage orders</div>
+              </div>
+            </router-link>
           </div>
         </div>
       </div>

@@ -32,6 +32,30 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/customers/CustomersView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/orders',
+    name: 'Orders',
+    component: () => import('../views/orders/OrdersView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/orders/create',
+    name: 'CreateOrder',
+    component: () => import('../views/orders/OrderFormView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/orders/:id',
+    name: 'OrderDetail',
+    component: () => import('../views/orders/OrderDetailView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/orders/:id/edit',
+    name: 'EditOrder',
+    component: () => import('../views/orders/OrderFormView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
