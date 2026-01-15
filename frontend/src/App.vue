@@ -1,17 +1,25 @@
 <template>
-  <div id="app">
+  <AppLayout v-if="shouldShowLayout">
     <RouterView />
-  </div>
+  </AppLayout>
+  <RouterView v-else />
 </template>
 
 <script setup lang="ts">
-import { RouterView } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import AppLayout from './components/layout/AppLayout.vue'
+
+const route = useRoute()
+
+// Don't show layout on login/register pages
+const shouldShowLayout = computed(() => {
+  return !['Login', 'Register'].includes(route.name as string)
+})
 </script>
 
 <style>
 #app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
 }
 </style>

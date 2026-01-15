@@ -20,6 +20,18 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/RegisterView.vue'),
     meta: { guest: true },
   },
+  {
+    path: '/products',
+    name: 'Products',
+    component: () => import('../views/products/ProductsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/customers',
+    name: 'Customers',
+    component: () => import('../views/customers/CustomersView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

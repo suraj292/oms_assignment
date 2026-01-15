@@ -36,11 +36,25 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Admin-only routes
     Route::middleware('role:Admin')->group(function () {
-        // Admin routes will go here
+        // Products - Admin can create, update, delete
+        Route::post('/products', [App\Http\Controllers\Api\ProductController::class, 'store']);
+        Route::put('/products/{product}', [App\Http\Controllers\Api\ProductController::class, 'update']);
+        Route::delete('/products/{product}', [App\Http\Controllers\Api\ProductController::class, 'destroy']);
+
+        // Customers - Admin can create, update, delete
+        Route::post('/customers', [App\Http\Controllers\Api\CustomerController::class, 'store']);
+        Route::put('/customers/{customer}', [App\Http\Controllers\Api\CustomerController::class, 'update']);
+        Route::delete('/customers/{customer}', [App\Http\Controllers\Api\CustomerController::class, 'destroy']);
     });
 
     // Admin and Staff routes
     Route::middleware('role:Admin,Staff')->group(function () {
-        // Shared routes will go here
+        // Products - Both can view
+        Route::get('/products', [App\Http\Controllers\Api\ProductController::class, 'index']);
+        Route::get('/products/{product}', [App\Http\Controllers\Api\ProductController::class, 'show']);
+
+        // Customers - Both can view
+        Route::get('/customers', [App\Http\Controllers\Api\CustomerController::class, 'index']);
+        Route::get('/customers/{customer}', [App\Http\Controllers\Api\CustomerController::class, 'show']);
     });
 });

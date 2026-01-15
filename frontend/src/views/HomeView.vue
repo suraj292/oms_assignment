@@ -1,131 +1,204 @@
 <template>
-  <div class="home">
-    <div class="header">
-      <h1>Order Management System</h1>
-      <div v-if="authStore.isAuthenticated" class="user-info">
-        <p>Welcome, <strong>{{ authStore.user?.name }}</strong></p>
-        <p class="role-badge">Role: {{ authStore.user?.role }}</p>
-        <button @click="handleLogout" class="btn-logout">Logout</button>
+  <PageContainer 
+    title="Order Management System" 
+    subtitle="Welcome back! Here's what you can do today."
+  >
+    <div class="dashboard-grid">
+      <div class="welcome-card card">
+        <div class="card-body">
+          <div class="user-info-section">
+            <div class="user-avatar">
+              {{ authStore.user?.name?.charAt(0).toUpperCase() }}
+            </div>
+            <div>
+              <h2 class="user-greeting">Hello, {{ authStore.user?.name }}!</h2>
+              <p class="user-role-text">
+                You're logged in as 
+                <span :class="['role-badge', authStore.isAdmin ? 'badge-info' : 'badge-success']">
+                  {{ authStore.user?.role }}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <div v-if="authStore.isAdmin" class="permissions-info">
+            <p class="permissions-title">✓ Admin Permissions</p>
+            <ul class="permissions-list">
+              <li>Create, edit, and delete products</li>
+              <li>Manage customer database</li>
+              <li>Full access to all features</li>
+            </ul>
+          </div>
+          <div v-else class="permissions-info">
+            <p class="permissions-title">✓ Staff Permissions</p>
+            <ul class="permissions-list">
+              <li>View products and customers</li>
+              <li>Process orders</li>
+              <li>Limited editing capabilities</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-actions-card card">
+        <div class="card-header">
+          <h3>Quick Actions</h3>
+        </div>
+        <div class="card-body">
+          <div class="action-links">
+            <router-link to="/products" class="action-link">
+              <span class="action-icon">📦</span>
+              <div>
+                <div class="action-title">Products</div>
+                <div class="action-description">Manage inventory</div>
+              </div>
+            </router-link>
+
+            <router-link to="/customers" class="action-link">
+              <span class="action-icon">👥</span>
+              <div>
+                <div class="action-title">Customers</div>
+                <div class="action-description">Customer database</div>
+              </div>
+            </router-link>
+          </div>
+        </div>
       </div>
     </div>
-
-    <div v-if="authStore.isAuthenticated" class="content">
-      <p>You are logged in and authenticated.</p>
-      <p v-if="authStore.isAdmin" class="admin-notice">
-        ✓ You have Admin access
-      </p>
-      <p v-else-if="authStore.isStaff" class="staff-notice">
-        ✓ You have Staff access
-      </p>
-    </div>
-    <div v-else class="content">
-      <p>Please log in to access the system.</p>
-      <router-link to="/login" class="btn-primary">Go to Login</router-link>
-    </div>
-  </div>
+  </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { authAPI } from '@/api/auth'
+import PageContainer from '@/components/layout/PageContainer.vue'
 
-const router = useRouter()
 const authStore = useAuthStore()
-
-async function handleLogout() {
-  try {
-    await authAPI.logout()
-  } catch (error) {
-    console.error('Logout error:', error)
-  } finally {
-    authStore.logout()
-    router.push('/login')
-  }
-}
 </script>
 
 <style scoped>
-.home {
-  padding: 2rem;
-  max-width: 800px;
-  margin: 0 auto;
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
 }
 
-.header {
+@media (max-width: 768px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.welcome-card {
+  grid-column: span 2;
+}
+
+@media (max-width: 768px) {
+  .welcome-card {
+    grid-column: span 1;
+  }
+}
+
+.user-info-section {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 1.5rem;
   margin-bottom: 2rem;
-  flex-wrap: wrap;
-  gap: 1rem;
 }
 
-h1 {
+.user-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary), #3b82f6);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.user-greeting {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-gray-900);
+}
+
+.user-role-text {
   margin: 0;
-  color: #333;
-}
-
-.user-info {
-  text-align: right;
-}
-
-.user-info p {
-  margin: 0.25rem 0;
+  color: var(--color-gray-600);
+  font-size: 0.9375rem;
 }
 
 .role-badge {
-  display: inline-block;
-  background: #4CAF50;
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.875rem;
+  margin-left: 0.5rem;
 }
 
-.btn-logout {
-  margin-top: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: #f44336;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.875rem;
+.permissions-info {
+  background: var(--color-gray-50);
+  padding: 1.25rem;
+  border-radius: var(--radius-md);
 }
 
-.btn-logout:hover {
-  background: #d32f2f;
+.permissions-title {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+  color: var(--color-gray-900);
 }
 
-.content {
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+.permissions-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--color-gray-600);
 }
 
-.admin-notice {
-  color: #4CAF50;
+.permissions-list li {
+  margin-bottom: 0.375rem;
+}
+
+.quick-actions-card h3 {
+  margin: 0;
+  font-size: 1.125rem;
   font-weight: 600;
 }
 
-.staff-notice {
-  color: #2196F3;
-  font-weight: 600;
+.action-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.btn-primary {
-  display: inline-block;
-  margin-top: 1rem;
-  padding: 0.75rem 1.5rem;
-  background: #4CAF50;
-  color: white;
+.action-link {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--color-gray-50);
+  border-radius: var(--radius-md);
   text-decoration: none;
-  border-radius: 4px;
+  transition: all 0.15s;
+  border: 1px solid transparent;
 }
 
-.btn-primary:hover {
-  background: #45a049;
+.action-link:hover {
+  background: white;
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.action-icon {
+  font-size: 2rem;
+}
+
+.action-title {
+  font-weight: 600;
+  color: var(--color-gray-900);
+  margin-bottom: 0.125rem;
+}
+
+.action-description {
+  font-size: 0.875rem;
+  color: var(--color-gray-500);
 }
 </style>
