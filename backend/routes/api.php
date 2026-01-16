@@ -72,6 +72,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/orders/{order}/documents/{document}', [App\Http\Controllers\Api\OrderDocumentController::class, 'destroy'])
             ->middleware('role:Admin');
 
+        // Chunked Uploads - Both can use
+        Route::post('/uploads/init', [App\Http\Controllers\Api\ChunkedUploadController::class, 'initialize']);
+        Route::post('/uploads/{uploadId}/chunk', [App\Http\Controllers\Api\ChunkedUploadController::class, 'uploadChunk']);
+        Route::get('/uploads/{uploadId}/status', [App\Http\Controllers\Api\ChunkedUploadController::class, 'getStatus']);
+        Route::post('/uploads/{uploadId}/complete', [App\Http\Controllers\Api\ChunkedUploadController::class, 'complete']);
+        Route::delete('/uploads/{uploadId}', [App\Http\Controllers\Api\ChunkedUploadController::class, 'cancel']);
+
         // Notifications - All authenticated users
         Route::get('/notifications', [App\Http\Controllers\Api\NotificationController::class, 'index']);
         Route::get('/notifications/unread-count', [App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);

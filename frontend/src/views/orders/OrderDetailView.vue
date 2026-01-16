@@ -125,6 +125,23 @@
           <p class="notes-text">{{ order.notes }}</p>
         </div>
       </div>
+
+      <!-- File Upload Section -->
+      <div class="upload-section card">
+        <div class="card-header">
+          <h3>Upload Documents</h3>
+        </div>
+        <div class="card-body">
+          <ChunkedFileUpload
+            target-type="order_document"
+            :target-id="order.id"
+            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.csv"
+            button-text="Upload Document"
+            @upload-complete="handleUploadComplete"
+            @upload-error="handleUploadError"
+          />
+        </div>
+      </div>
     </div>
   </PageContainer>
 </template>
@@ -136,6 +153,7 @@ import { ordersAPI } from '@/api/orders'
 import type { Order, OrderStatus } from '@/types/models'
 import PageContainer from '@/components/layout/PageContainer.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
+import ChunkedFileUpload from '@/components/common/ChunkedFileUpload.vue'
 
 const route = useRoute()
 
@@ -196,6 +214,16 @@ function formatDate(dateString: string): string {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+function handleUploadComplete(fileUrl: string) {
+  console.log('File uploaded successfully:', fileUrl)
+  loadOrder()
+}
+
+function handleUploadError(error: Error) {
+  console.error('Upload error:', error)
+  alert('Failed to upload file: ' + error.message)
 }
 
 onMounted(() => {
