@@ -66,5 +66,16 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/orders/{order}', [App\Http\Controllers\Api\OrderController::class, 'show']);
         Route::put('/orders/{order}', [App\Http\Controllers\Api\OrderController::class, 'update']);
         Route::patch('/orders/{order}/status', [App\Http\Controllers\Api\OrderController::class, 'updateStatus']);
+
+        // Order Documents - Both can upload, Admin can delete
+        Route::post('/orders/{order}/documents', [App\Http\Controllers\Api\OrderDocumentController::class, 'store']);
+        Route::delete('/orders/{order}/documents/{document}', [App\Http\Controllers\Api\OrderDocumentController::class, 'destroy'])
+            ->middleware('role:Admin');
+
+        // Notifications - All authenticated users
+        Route::get('/notifications', [App\Http\Controllers\Api\NotificationController::class, 'index']);
+        Route::get('/notifications/unread-count', [App\Http\Controllers\Api\NotificationController::class, 'unreadCount']);
+        Route::patch('/notifications/{id}/read', [App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
+        Route::post('/notifications/mark-all-read', [App\Http\Controllers\Api\NotificationController::class, 'markAllAsRead']);
     });
 });

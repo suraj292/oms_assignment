@@ -17,6 +17,7 @@
         </div>
 
         <div v-if="authStore.isAuthenticated" class="header-right">
+          <NotificationBell />
           <div class="user-menu">
             <span class="user-name">{{ authStore.user?.name }}</span>
             <span class="user-role">{{ authStore.user?.role }}</span>
@@ -37,6 +38,7 @@
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { authAPI } from '@/api/auth'
+import NotificationBell from './NotificationBell.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()

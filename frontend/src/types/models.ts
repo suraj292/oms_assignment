@@ -98,3 +98,20 @@ export interface OrderFormData {
     quantity: number | string
   }>
 }
+
+// Notification types
+export interface Notification {
+  id: string
+  type: string
+  data: {
+    type: 'order_created' | 'order_status_changed'
+    order_id: number
+    order_number: string
+    message: string
+    total?: string
+    old_status?: string
+    new_status?: string
+  }
+  read_at: string | null
+  created_at: string
+}

@@ -56,6 +56,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/orders/OrderFormView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/notifications',
+    name: 'Notifications',
+    component: () => import('../views/NotificationsView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({

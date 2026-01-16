@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\OrderStatus;
+use App\Notifications\OrderCreatedNotification;
+use App\Notifications\OrderStatusChangedNotification;
 use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
@@ -30,6 +32,21 @@ class Order extends Model
                 $order->order_number = 'ORD-' . strtoupper(uniqid());
             }
         });
+
+        // Send notification after order is created
+        static::created(function ($order) {
+            $order->load('customer');
+            
+            // Notify the customer
+            if ($order->customer) {
+                $order->customer->notify(new OrderCreatedNotification($order));
+            }
+            
+            // Notify the authenticated user (admin/staff who created the order)
+            if (auth()->check()) {
+                auth()->user()->notify(new OrderCreatedNotification($order));
+            }
+        });
     }
 
     public function customer()
@@ -40,6 +57,11 @@ class Order extends Model
     public function items()
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function documents()
+    {
+        return $this->hasMany(OrderDocument::class);
     }
 
     /**
@@ -76,8 +98,26 @@ class Order extends Model
             return false;
         }
 
+        $oldStatus = $this->status;
         $this->status = $newStatus;
-        return $this->save();
+        $saved = $this->save();
+
+        // Send notification after status change
+        if ($saved) {
+            $this->load('customer');
+            
+            // Notify the customer
+            if ($this->customer) {
+                $this->customer->notify(new OrderStatusChangedNotification($this, $oldStatus, $newStatus));
+            }
+            
+            // Notify the authenticated user (admin/staff who changed the status)
+            if (auth()->check()) {
+                auth()->user()->notify(new OrderStatusChangedNotification($this, $oldStatus, $newStatus));
+            }
+        }
+
+        return $saved;
     }
 
     /**
