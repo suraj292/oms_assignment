@@ -145,9 +145,7 @@ onMounted(() => {
     const channel = pusher.subscribe(`App.Models.User.${authStore.user.id}`)
     
     // Listen for notification events
-    channel.bind('Illuminate\\Notifications\\Events\\BroadcastNotificationCreated', (data: any) => {
-      console.log('New notification received:', data)
-      
+    channel.bind('Illuminate\\Notifications\\Events\\BroadcastNotificationCreated', () => {
       // Increment unread count
       unreadCount.value++
       

@@ -216,8 +216,7 @@ function formatDate(dateString: string): string {
   })
 }
 
-function handleUploadComplete(fileUrl: string) {
-  console.log('File uploaded successfully:', fileUrl)
+function handleUploadComplete() {
   loadOrder()
 }
 
