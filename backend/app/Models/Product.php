@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
+    use Searchable;
+
     protected $fillable = [
         'name',
         'description',
@@ -26,11 +29,8 @@ class Product extends Model
         return $query->where('status', 'active');
     }
 
-    public function scopeSearch($query, $search)
+    protected function getSearchableFields(): array
     {
-        return $query->where(function ($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-              ->orWhere('description', 'like', "%{$search}%");
-        });
+        return ['name', 'description'];
     }
 }

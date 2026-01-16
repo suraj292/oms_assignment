@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
 class Customer extends Model
 {
-    use Notifiable;
+    use Notifiable, Searchable;
+
     protected $fillable = [
         'name',
         'email',
@@ -15,12 +17,13 @@ class Customer extends Model
         'address',
     ];
 
-    public function scopeSearch($query, $search)
+    public function orders()
     {
-        return $query->where(function ($q) use ($search) {
-            $q->where('name', 'like', "%{$search}%")
-              ->orWhere('email', 'like', "%{$search}%")
-              ->orWhere('phone', 'like', "%{$search}%");
-        });
+        return $this->hasMany(Order::class);
+    }
+
+    protected function getSearchableFields(): array
+    {
+        return ['name', 'email', 'phone'];
     }
 }

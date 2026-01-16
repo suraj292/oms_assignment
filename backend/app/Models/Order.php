@@ -5,10 +5,12 @@ namespace App\Models;
 use App\Enums\OrderStatus;
 use App\Notifications\OrderCreatedNotification;
 use App\Notifications\OrderStatusChangedNotification;
+use App\Traits\Searchable;
 use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
+    use Searchable;
     protected $fillable = [
         'order_number',
         'customer_id',
@@ -125,25 +127,16 @@ class Order extends Model
      */
     public function allowedNextStatuses(): array
     {
-        return $this->status->allowedTransitions();
+        return OrderStatus::getValidTransitions($this->status);
+    }
+
+    protected function getSearchableFields(): array
+    {
+        return ['order_number'];
     }
 
     public function scopeByStatus($query, $status)
     {
-        if ($status) {
-            return $query->where('status', $status);
-        }
-        return $query;
-    }
-
-    public function scopeSearch($query, $search)
-    {
-        return $query->where(function ($q) use ($search) {
-            $q->where('order_number', 'like', "%{$search}%")
-              ->orWhereHas('customer', function ($q) use ($search) {
-                  $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
-              });
-        });
+        return $query->where('status', $status);
     }
 }
