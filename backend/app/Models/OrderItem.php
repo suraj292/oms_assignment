@@ -25,12 +25,12 @@ class OrderItem extends Model
     {
         parent::boot();
 
-        // Calculate subtotal before saving
+
         static::saving(function ($item) {
             $item->subtotal = $item->price * $item->quantity;
         });
 
-        // Recalculate order total after item changes
+
         static::saved(function ($item) {
             $item->order->calculateTotal();
         });

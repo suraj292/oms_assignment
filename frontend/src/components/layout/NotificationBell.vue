@@ -82,9 +82,10 @@ async function fetchNotifications() {
 async function fetchUnreadCount() {
   try {
     const response = await notificationsAPI.getUnreadCount()
-    unreadCount.value = response.data.data.count
+    const newCount = response.data.data.count
+    unreadCount.value = newCount
   } catch (error) {
-    console.error('Failed to fetch unread count:', error)
+    console.error('[NotificationBell] Failed to fetch unread count:', error)
   }
 }
 
@@ -97,7 +98,7 @@ async function handleNotificationClick(notification: Notification) {
 
   showDropdown.value = false
 
-  // Navigate to order if it's an order notification
+
   if (notification.data.order_id) {
     router.push(`/orders/${notification.data.order_id}`)
   }
@@ -127,7 +128,6 @@ function formatTime(dateString: string): string {
   return `${days}d ago`
 }
 
-// Close dropdown when clicking outside
 function handleClickOutside(event: MouseEvent) {
   const target = event.target as HTMLElement
   if (!target.closest('.notification-bell')) {
@@ -135,21 +135,22 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
-// Setup Pusher real-time notifications
+let pollingInterval: number | null = null
+
 onMounted(() => {
-  // Initial fetch
   fetchUnreadCount()
+  
+  // Poll for updates every 10 seconds as fallback
+  pollingInterval = window.setInterval(() => {
+    fetchUnreadCount()
+  }, 10000)
   
   // Subscribe to user's notification channel
   if (authStore.user?.id) {
     const channel = pusher.subscribe(`App.Models.User.${authStore.user.id}`)
     
-    // Listen for notification events
     channel.bind('Illuminate\\Notifications\\Events\\BroadcastNotificationCreated', () => {
-      // Increment unread count
       unreadCount.value++
-      
-      // Refresh notifications if dropdown is open
       if (showDropdown.value) {
         fetchNotifications()
       }
@@ -160,7 +161,12 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  // Unsubscribe from Pusher channel
+
+  if (pollingInterval) {
+    clearInterval(pollingInterval)
+  }
+  
+
   if (authStore.user?.id) {
     pusher.unsubscribe(`App.Models.User.${authStore.user.id}`)
   }

@@ -50,13 +50,13 @@ class OrderDocumentController extends BaseApiController
      */
     public function destroy(Order $order, OrderDocument $document)
     {
-        // Verify document belongs to order
+
         if ($document->order_id !== $order->id) {
             return $this->errorResponse('Document not found', 404);
         }
 
         try {
-            // Delete file from storage
+
             if (Storage::disk('public')->exists($document->file_path)) {
                 Storage::disk('public')->delete($document->file_path);
             }

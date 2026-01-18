@@ -31,7 +31,7 @@ class Order extends Model
 
         static::creating(function ($order) {
             if (!$order->order_number) {
-                // auto-generate order number if not provided
+
                 $order->order_number = 'ORD-' . strtoupper(uniqid());
             }
         });
@@ -93,12 +93,12 @@ class Order extends Model
         if ($wasSuccessful) {
             $this->load('customer');
             
-            // notify customer about status change
+
             if ($this->customer) {
                 $this->customer->notify(new OrderStatusChangedNotification($this, $previousStatus, $newStatus));
             }
             
-            // notify the person who changed it too
+
             if (auth()->check()) {
                 auth()->user()->notify(new OrderStatusChangedNotification($this, $previousStatus, $newStatus));
             }

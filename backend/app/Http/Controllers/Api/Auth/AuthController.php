@@ -17,7 +17,7 @@ class AuthController extends BaseApiController
      */
     public function register(RegisterRequest $request)
     {
-        // Get the Staff role by default for new registrations
+
         $staffRole = Role::where('name', 'Staff')->first();
 
         $user = User::create([
@@ -51,7 +51,7 @@ class AuthController extends BaseApiController
             return $this->errorResponse('Invalid credentials', 401);
         }
 
-        // Delete old tokens
+
         $user->tokens()->delete();
 
         $token = $user->createToken('auth_token')->plainTextToken;

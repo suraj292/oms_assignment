@@ -124,14 +124,14 @@ async function handleLogout() {
   }
 }
 
-// Initialize Lucide icons after component mounts
+
 onMounted(() => {
   if (window.lucide) {
     window.lucide.createIcons()
   }
 })
 
-// Re-initialize icons when route changes
+
 watch(route, () => {
   setTimeout(() => {
     if (window.lucide) {

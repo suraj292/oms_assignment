@@ -74,21 +74,21 @@ router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore()
   const isAuthenticated = authStore.isAuthenticated
 
-  // Handle root path - redirect based on auth status
+
   if (to.path === '/') {
     if (isAuthenticated) {
-      // User is logged in, show dashboard (Home)
+
       next()
     } else {
-      // User is not logged in, redirect to login
+
       next('/login')
     }
   }
-  // Redirect to login if route requires auth and user is not authenticated
+
   else if (to.meta.requiresAuth && !isAuthenticated) {
     next('/login')
   }
-  // Redirect to home if route is for guests only and user is authenticated
+
   else if (to.meta.guest && isAuthenticated) {
     next('/')
   }

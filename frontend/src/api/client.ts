@@ -17,7 +17,7 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${authStore.token}`
     }
 
-    // If sending FormData, remove Content-Type to let axios set it automatically
+
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type']
     }
@@ -36,7 +36,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       const authStore = useAuthStore()
       authStore.logout()
-      // Optionally redirect to login
+
     }
     return Promise.reject(error)
   }

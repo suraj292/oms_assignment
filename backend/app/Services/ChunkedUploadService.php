@@ -7,23 +7,17 @@ use Illuminate\Support\Str;
 
 class ChunkedUploadService
 {
-    private const CHUNK_STORAGE_PATH = 'chunks';
-    private const METADATA_FILE = 'metadata.json';
-    private const CHUNK_PREFIX = 'chunk_';
-    private const CHUNK_EXTENSION = '.tmp';
 
-    /**
-     * Initialize a new chunked upload session
-     */
-    public function initializeUpload(string $filename, int $totalChunks, int $fileSize): array
+    private const CHUNKS_DIR = 'chunks';
+    
+    public function initUpload(string $filename, int $totalChunks, int $fileSize): array
     {
         $uploadId = (string) Str::uuid();
         $uploadPath = $this->getUploadPath($uploadId);
 
-        // Create upload directory
         Storage::makeDirectory($uploadPath);
 
-        // Create metadata
+
         $metadata = [
             'upload_id' => $uploadId,
             'filename' => $filename,
@@ -38,14 +32,11 @@ class ChunkedUploadService
 
         return [
             'upload_id' => $uploadId,
-            'chunk_size' => 1048576, // 1MB
+            'chunk_size' => 1048576, // 1MB chunks
         ];
     }
 
-    /**
-     * Store a chunk
-     */
-    public function storeChunk(string $uploadId, int $chunkIndex, $chunkData): array
+    public function saveChunk(string $uploadId, int $chunkIndex, $chunkData): array
     {
         $metadata = $this->getMetadata($uploadId);
 
@@ -53,16 +44,14 @@ class ChunkedUploadService
             throw new \Exception('Upload session not found');
         }
 
-        // Validate chunk index
         if ($chunkIndex < 0 || $chunkIndex >= $metadata['total_chunks']) {
             throw new \Exception('Invalid chunk index');
         }
 
-        // Store chunk
         $chunkPath = $this->getChunkPath($uploadId, $chunkIndex);
         Storage::put($chunkPath, $chunkData);
 
-        // Update metadata
+
         if (!in_array($chunkIndex, $metadata['received_chunks'])) {
             $metadata['received_chunks'][] = $chunkIndex;
             sort($metadata['received_chunks']);
@@ -78,10 +67,7 @@ class ChunkedUploadService
         ];
     }
 
-    /**
-     * Get upload status
-     */
-    public function getUploadStatus(string $uploadId): ?array
+    public function getStatus(string $uploadId): ?array
     {
         $metadata = $this->getMetadata($uploadId);
 
@@ -95,16 +81,13 @@ class ChunkedUploadService
             'total_chunks' => $metadata['total_chunks'],
             'file_size' => $metadata['file_size'],
             'received_chunks' => $metadata['received_chunks'],
-            'is_complete' => $this->isUploadComplete($uploadId, $metadata['total_chunks']),
+            'is_complete' => $this->isComplete($uploadId, $metadata['total_chunks']),
             'created_at' => $metadata['created_at'],
             'updated_at' => $metadata['updated_at'],
         ];
     }
 
-    /**
-     * Check if all chunks have been received
-     */
-    public function isUploadComplete(string $uploadId, int $totalChunks): bool
+    public function isComplete(string $uploadId, int $totalChunks): bool
     {
         $metadata = $this->getMetadata($uploadId);
 
@@ -115,9 +98,6 @@ class ChunkedUploadService
         return count($metadata['received_chunks']) === $totalChunks;
     }
 
-    /**
-     * Merge all chunks into final file
-     */
     public function mergeChunks(string $uploadId, string $finalPath): bool
     {
         $metadata = $this->getMetadata($uploadId);
@@ -126,11 +106,10 @@ class ChunkedUploadService
             throw new \Exception('Upload session not found');
         }
 
-        if (!$this->isUploadComplete($uploadId, $metadata['total_chunks'])) {
-            throw new \Exception('Upload is not complete');
+        if (!$this->isComplete($uploadId, $metadata['total_chunks'])) {
+            throw new \Exception('Upload not complete yet');
         }
 
-        // Create final file
         $finalFullPath = Storage::path($finalPath);
         $finalDir = dirname($finalFullPath);
 
@@ -141,17 +120,17 @@ class ChunkedUploadService
         $finalFile = fopen($finalFullPath, 'wb');
 
         if (!$finalFile) {
-            throw new \Exception('Failed to create final file');
+            throw new \Exception('Could not create final file');
         }
 
-        // Merge chunks in order
+        // stitch all the chunks together in order
         for ($i = 0; $i < $metadata['total_chunks']; $i++) {
             $chunkPath = $this->getChunkPath($uploadId, $i);
             $chunkFullPath = Storage::path($chunkPath);
 
             if (!file_exists($chunkFullPath)) {
                 fclose($finalFile);
-                throw new \Exception("Chunk $i is missing");
+                throw new \Exception("Missing chunk $i");
             }
 
             $chunkData = file_get_contents($chunkFullPath);
@@ -160,39 +139,33 @@ class ChunkedUploadService
 
         fclose($finalFile);
 
-        // Verify file size
+        // make sure the final file size matches what we expected
         $finalSize = filesize($finalFullPath);
         if ($finalSize !== $metadata['file_size']) {
             unlink($finalFullPath);
-            throw new \Exception('Merged file size mismatch');
+            throw new \Exception('File size mismatch after merge');
         }
 
         return true;
     }
 
-    /**
-     * Cleanup upload (remove all chunks and metadata)
-     */
-    public function cleanupUpload(string $uploadId): bool
+    public function cleanup(string $uploadId): bool
     {
         $uploadPath = $this->getUploadPath($uploadId);
         return Storage::deleteDirectory($uploadPath);
     }
 
-    /**
-     * Cleanup stale uploads (older than specified hours)
-     */
-    public function cleanupStaleUploads(int $hours = 24): int
+    // clean up old uploads that have been sitting around too long
+    public function cleanupOldUploads(int $hours = 24): int
     {
         $cleaned = 0;
-        $directories = Storage::directories(self::CHUNK_STORAGE_PATH);
+        $directories = Storage::directories(self::CHUNKS_DIR);
 
         foreach ($directories as $dir) {
             $uploadId = basename($dir);
             $metadata = $this->getMetadata($uploadId);
 
             if (!$metadata) {
-                // No metadata, delete directory
                 Storage::deleteDirectory($dir);
                 $cleaned++;
                 continue;
@@ -212,33 +185,21 @@ class ChunkedUploadService
         return $cleaned;
     }
 
-    /**
-     * Get upload directory path
-     */
     private function getUploadPath(string $uploadId): string
     {
-        return self::CHUNK_STORAGE_PATH . '/' . $uploadId;
+        return self::CHUNKS_DIR . '/' . $uploadId;
     }
 
-    /**
-     * Get chunk file path
-     */
     private function getChunkPath(string $uploadId, int $chunkIndex): string
     {
-        return $this->getUploadPath($uploadId) . '/' . self::CHUNK_PREFIX . $chunkIndex . self::CHUNK_EXTENSION;
+        return $this->getUploadPath($uploadId) . '/chunk_' . $chunkIndex . '.tmp';
     }
 
-    /**
-     * Get metadata file path
-     */
     private function getMetadataPath(string $uploadId): string
     {
-        return $this->getUploadPath($uploadId) . '/' . self::METADATA_FILE;
+        return $this->getUploadPath($uploadId) . '/metadata.json';
     }
 
-    /**
-     * Get metadata
-     */
     private function getMetadata(string $uploadId): ?array
     {
         $metadataPath = $this->getMetadataPath($uploadId);
@@ -251,9 +212,6 @@ class ChunkedUploadService
         return json_decode($json, true);
     }
 
-    /**
-     * Save metadata
-     */
     private function saveMetadata(string $uploadId, array $metadata): void
     {
         $metadataPath = $this->getMetadataPath($uploadId);

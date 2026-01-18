@@ -132,12 +132,10 @@
           <h3>Upload Documents</h3>
         </div>
         <div class="card-body">
-          <!-- Success Message -->
           <div v-if="uploadSuccess" class="alert alert-success upload-success">
             ✓ Document uploaded successfully!
           </div>
           
-          <!-- Show upload component only if no documents exist -->
           <ChunkedFileUpload
             v-if="!order.documents || order.documents.length === 0"
             target-type="order_document"
@@ -147,7 +145,6 @@
             @upload-error="handleUploadError"
           />
 
-          <!-- Uploaded Documents List -->
           <div v-if="order.documents && order.documents.length > 0" class="documents-list">
             <h4 class="documents-title">Uploaded Documents ({{ order.documents.length }})</h4>
             <div class="documents-grid">
@@ -256,7 +253,7 @@ function handleUploadComplete() {
   uploadSuccess.value = true
   loadOrder()
   
-  // Auto-dismiss success message after 5 seconds
+
   setTimeout(() => {
     uploadSuccess.value = false
   }, 5000)
@@ -276,7 +273,7 @@ function formatFileSize(bytes: number): string {
 }
 
 async function deleteDocument(documentId: number) {
-  // Use native browser confirmation
+
   const confirmed = window.confirm('Are you sure you want to delete this document? This action cannot be undone.')
   
   if (!confirmed) {
@@ -301,7 +298,7 @@ async function deleteDocument(documentId: number) {
       throw new Error(error.message || 'Failed to delete document')
     }
     
-    // Reload order to refresh documents list
+
     await loadOrder()
   } catch (err: any) {
     console.error('Delete error:', err)
@@ -312,7 +309,7 @@ async function deleteDocument(documentId: number) {
 onMounted(() => {
   loadOrder()
   
-  // Initialize Lucide icons
+
   if (window.lucide) {
     window.lucide.createIcons()
   }

@@ -181,7 +181,7 @@ function handleFileSelect(event: Event) {
 
   if (!file) return
 
-  // Validate file size
+
   if (props.maxFileSize && file.size > props.maxFileSize) {
     error.value = `File size exceeds maximum allowed (${formatFileSize(props.maxFileSize)})`
     return
@@ -218,14 +218,11 @@ function startUpload(file: File) {
     emit('upload-error', err)
   }
 
-  // Check if this is a resumed upload (status will be 'paused' from restored state)
   const currentStatus = uploadManager.value.getStatus()
   
   if (currentStatus === 'paused' || currentStatus === 'cancelled') {
-    // Don't auto-start, wait for user to click Resume
-    // The status is already set from restoreState()
+    
   } else {
-    // New upload - start immediately
     uploadManager.value.start()
   }
 }
@@ -257,16 +254,13 @@ function reset() {
   error.value = ''
   resumableUpload.value = null
   
-  // Check for new resumable uploads after reset
   checkForResumableUpload()
   if (fileInput.value) {
     fileInput.value.value = ''
   }
 }
 
-// Check for resumable uploads on mount
 function checkForResumableUpload() {
-  // Check all possible resumable uploads in localStorage
   const keys = Object.keys(localStorage)
   const uploadKey = keys.find(key => 
     key.startsWith(`chunked_upload_${props.targetType}_${props.targetId}_`)
@@ -282,53 +276,42 @@ function checkForResumableUpload() {
   }
 }
 
-// Resume previous upload
 async function resumePreviousUpload() {
   if (!resumableUpload.value) return
   
-  // Trigger file selection - user must select the same file
   fileInput.value?.click()
   
-  // Store resumable upload info temporarily
   const tempResumableUpload = resumableUpload.value
   resumableUpload.value = null
   
-  // Wait for file selection
   const handleResumeFileSelect = (event: Event) => {
     const target = event.target as HTMLInputElement
     const file = target.files?.[0]
     
     if (!file) {
-      // User cancelled - restore resume prompt
       resumableUpload.value = tempResumableUpload
       return
     }
     
-    // Validate file matches
     if (file.name !== tempResumableUpload.fileName || file.size !== tempResumableUpload.fileSize) {
       error.value = `Please select the same file: ${tempResumableUpload.fileName} (${formatFileSize(tempResumableUpload.fileSize)})`
       resumableUpload.value = tempResumableUpload
       return
     }
     
-    // File matches - start upload (will auto-restore state)
     selectedFile.value = file
     error.value = ''
     startUpload(file)
     
-    // Remove this one-time listener
     fileInput.value?.removeEventListener('change', handleResumeFileSelect)
   }
   
-  // Add one-time listener for file selection
   fileInput.value?.addEventListener('change', handleResumeFileSelect, { once: true })
 }
 
-// Discard previous upload
 function discardPreviousUpload() {
   if (!resumableUpload.value) return
   
-  // Clear the saved state
   const storageKey = `chunked_upload_${props.targetType}_${props.targetId}_${resumableUpload.value.fileName}`
   localStorage.removeItem(storageKey)
   

@@ -12,7 +12,7 @@ import AppLayout from './components/layout/AppLayout.vue'
 
 const route = useRoute()
 
-// Don't show layout on login/register pages
+
 const shouldShowLayout = computed(() => {
   return !['Login', 'Register'].includes(route.name as string)
 })

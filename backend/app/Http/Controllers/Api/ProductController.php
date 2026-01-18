@@ -18,12 +18,12 @@ class ProductController extends BaseApiController
     {
         $query = Product::query();
 
-        // Search
+
         if ($request->has('search')) {
             $query->search($request->search);
         }
 
-        // Filter by status
+
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
@@ -40,7 +40,7 @@ class ProductController extends BaseApiController
     {
         $data = $request->validated();
 
-        // Handle image upload
+
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('products', 'public');
         }
@@ -69,9 +69,9 @@ class ProductController extends BaseApiController
     {
         $data = $request->validated();
 
-        // Handle image upload
+
         if ($request->hasFile('image')) {
-            // Delete old image if exists
+
             if ($product->image) {
                 Storage::disk('public')->delete($product->image);
             }
@@ -91,7 +91,7 @@ class ProductController extends BaseApiController
      */
     public function destroy(Product $product)
     {
-        // Delete image if exists
+
         if ($product->image) {
             Storage::disk('public')->delete($product->image);
         }

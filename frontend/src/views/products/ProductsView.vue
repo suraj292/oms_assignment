@@ -457,7 +457,6 @@ onMounted(() => {
   font-size: 0.9375rem;
 }
 
-/* Modal Styles */
 .modal-overlay {
   position: fixed;
   top: 0;

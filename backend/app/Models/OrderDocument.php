@@ -32,9 +32,6 @@ class OrderDocument extends Model
         return $this->belongsTo(User::class, 'uploaded_by');
     }
 
-    /**
-     * Get the public URL for the document
-     */
     public function getUrlAttribute(): string
     {
         return asset('storage/' . $this->file_path);

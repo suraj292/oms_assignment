@@ -19,7 +19,7 @@ class SendOrderCreatedNotifications implements ShouldQueue
         public Order $order,
         public ?int $createdByUserId = null
     ) {
-        //
+
     }
 
     /**
@@ -27,18 +27,19 @@ class SendOrderCreatedNotifications implements ShouldQueue
      */
     public function handle(): void
     {
-        // Load customer relationship
         $this->order->load('customer');
         
-        // Notify the customer
+
         if ($this->order->customer) {
             $this->order->customer->notify(new OrderCreatedNotification($this->order));
         }
         
-        // Notify the user who created the order
+
         if ($this->createdByUserId) {
             $user = User::find($this->createdByUserId);
-            if ($user) {
+            
+            // only notify if it's not the same person as the customer
+            if ($user && (!$this->order->customer || $user->email !== $this->order->customer->email)) {
                 $user->notify(new OrderCreatedNotification($this->order));
             }
         }

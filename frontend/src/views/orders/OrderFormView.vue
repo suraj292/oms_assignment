@@ -217,7 +217,7 @@ async function loadOrder() {
     const response = await ordersAPI.getById(orderId.value)
     order.value = response.data.data
 
-    // Populate form
+
     form.value.customer_id = order.value.customer_id
     form.value.notes = order.value.notes || ''
     form.value.items = order.value.items.map(item => ({

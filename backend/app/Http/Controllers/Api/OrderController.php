@@ -47,7 +47,7 @@ class OrderController extends BaseApiController
                 'status' => OrderStatus::DRAFT,
             ]);
 
-            // create order items from the products
+
             foreach ($request->items as $itemData) {
                 $product = Product::findOrFail($itemData['product_id']);
                 

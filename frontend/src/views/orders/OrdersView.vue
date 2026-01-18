@@ -200,7 +200,7 @@ function editOrder(orderId: number) {
 }
 
 async function deleteOrder(orderId: number) {
-  // simple confirmation for now, might want a nicer modal later
+
   if (!confirm('Are you sure you want to delete this order?')) return
 
   try {

@@ -22,13 +22,10 @@ class ChunkedUploadController extends BaseApiController
         $this->uploadService = $uploadService;
     }
 
-    /**
-     * Initialize a new chunked upload session
-     */
     public function initialize(InitializeUploadRequest $request)
     {
         try {
-            $result = $this->uploadService->initializeUpload(
+            $result = $this->uploadService->initUpload(
                 $request->input('filename'),
                 $request->input('total_chunks'),
                 $request->input('file_size')
@@ -40,34 +37,28 @@ class ChunkedUploadController extends BaseApiController
         }
     }
 
-    /**
-     * Upload a single chunk
-     */
     public function uploadChunk(UploadChunkRequest $request, string $uploadId)
     {
         try {
             $chunkIndex = $request->input('chunk_index');
             $chunkFile = $request->file('chunk');
 
-            $result = $this->uploadService->storeChunk(
+            $result = $this->uploadService->saveChunk(
                 $uploadId,
                 $chunkIndex,
                 file_get_contents($chunkFile->getRealPath())
             );
 
-            return $this->successResponse($result, 'Chunk uploaded successfully');
+            return $this->successResponse($result, 'Chunk uploaded');
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to upload chunk: ' . $e->getMessage(), 500);
         }
     }
 
-    /**
-     * Get upload status
-     */
     public function getStatus(string $uploadId)
     {
         try {
-            $status = $this->uploadService->getUploadStatus($uploadId);
+            $status = $this->uploadService->getStatus($uploadId);
 
             if (!$status) {
                 return $this->errorResponse('Upload session not found', 404);
@@ -79,13 +70,10 @@ class ChunkedUploadController extends BaseApiController
         }
     }
 
-    /**
-     * Complete upload and merge chunks
-     */
     public function complete(CompleteUploadRequest $request, string $uploadId)
     {
         try {
-            $status = $this->uploadService->getUploadStatus($uploadId);
+            $status = $this->uploadService->getStatus($uploadId);
 
             if (!$status) {
                 return $this->errorResponse('Upload session not found', 404);
@@ -98,7 +86,7 @@ class ChunkedUploadController extends BaseApiController
             $targetType = $request->input('target_type');
             $targetId = $request->input('target_id');
 
-            // Determine final file path
+
             $filename = Str::random(40) . '.' . pathinfo($status['filename'], PATHINFO_EXTENSION);
             
             if ($targetType === 'order_document') {
@@ -107,12 +95,11 @@ class ChunkedUploadController extends BaseApiController
                 $finalPath = 'products/documents/' . $filename;
             }
 
-            // Merge chunks
             $this->uploadService->mergeChunks($uploadId, 'public/' . $finalPath);
 
-            // Get MIME type safely
+
             $fullPath = Storage::path('public/' . $finalPath);
-            $mimeType = 'application/octet-stream'; // Default fallback
+            $mimeType = 'application/octet-stream';
             
             if (file_exists($fullPath)) {
                 $detectedMime = mime_content_type($fullPath);
@@ -121,7 +108,7 @@ class ChunkedUploadController extends BaseApiController
                 }
             }
 
-            // Create database record
+
             if ($targetType === 'order_document') {
                 $order = Order::findOrFail($targetId);
                 $document = OrderDocument::create([
@@ -138,7 +125,6 @@ class ChunkedUploadController extends BaseApiController
             } else {
                 $product = Product::findOrFail($targetId);
                 
-                // Delete old document if exists
                 if ($product->document) {
                     Storage::disk('public')->delete($product->document);
                 }
@@ -147,8 +133,8 @@ class ChunkedUploadController extends BaseApiController
                 $fileUrl = asset('storage/' . $finalPath);
             }
 
-            // Cleanup chunks
-            $this->uploadService->cleanupUpload($uploadId);
+
+            $this->uploadService->cleanup($uploadId);
 
             return $this->successResponse([
                 'file_path' => $finalPath,
@@ -160,16 +146,13 @@ class ChunkedUploadController extends BaseApiController
         }
     }
 
-    /**
-     * Cancel upload and cleanup
-     */
     public function cancel(string $uploadId)
     {
         try {
-            $this->uploadService->cleanupUpload($uploadId);
-            return $this->successResponse(null, 'Upload cancelled successfully');
+            $this->uploadService->cleanup($uploadId);
+            return $this->successResponse(null, 'Upload cancelled');
         } catch (\Exception $e) {
-            return $this->errorResponse('Failed to cancel upload: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Could not cancel upload: ' . $e->getMessage(), 500);
         }
     }
 }

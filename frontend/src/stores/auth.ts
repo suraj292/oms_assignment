@@ -31,7 +31,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  // Fetch user data if token exists
+
   async function fetchUser() {
     if (!token.value || loading.value) return
 
@@ -40,14 +40,14 @@ export const useAuthStore = defineStore('auth', () => {
       const response = await apiClient.get<{ success: boolean; data: User }>('/auth/me')
       user.value = response.data.data
     } catch (error) {
-      // Token is invalid, clear it
+
       logout()
     } finally {
       loading.value = false
     }
   }
 
-  // Auto-fetch user on store initialization if token exists
+
   if (token.value && !user.value) {
     fetchUser()
   }

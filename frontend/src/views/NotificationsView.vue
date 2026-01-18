@@ -101,7 +101,7 @@ async function fetchNotifications(page = 1) {
     notifications.value = response.data.data
     pagination.value = response.data.meta
     
-    // Count unread
+
     unreadCount.value = notifications.value.filter(n => !n.read_at).length
   } catch (err: any) {
     error.value = err.response?.data?.message || 'Failed to load notifications'
@@ -119,7 +119,7 @@ async function handleNotificationClick(notification: Notification) {
     await markAsRead(notification.id)
   }
 
-  // Navigate to order if it's an order notification
+
   if (notification.data.order_id) {
     router.push(`/orders/${notification.data.order_id}`)
   }
@@ -129,7 +129,7 @@ async function markAsRead(id: string) {
   try {
     await notificationsAPI.markAsRead(id)
     
-    // Update local state
+
     const notification = notifications.value.find(n => n.id === id)
     if (notification) {
       notification.read_at = new Date().toISOString()
@@ -145,7 +145,7 @@ async function markAllAsRead() {
   try {
     await notificationsAPI.markAllAsRead()
     
-    // Update local state
+
     notifications.value.forEach(n => {
       if (!n.read_at) {
         n.read_at = new Date().toISOString()
