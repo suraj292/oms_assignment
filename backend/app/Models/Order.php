@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 class Order extends Model
 {
     use Searchable;
+    
     protected $fillable = [
         'order_number',
         'customer_id',
@@ -28,26 +29,21 @@ class Order extends Model
     {
         parent::boot();
 
-        // Generate order number on creation
         static::creating(function ($order) {
             if (!$order->order_number) {
+                // auto-generate order number if not provided
                 $order->order_number = 'ORD-' . strtoupper(uniqid());
             }
         });
 
-        // Send notification after order is created
+        // Dispatch job to send notifications in background
+        // This ensures the order creation response is fast and notifications
+        // are sent asynchronously via the queue worker
         static::created(function ($order) {
-            $order->load('customer');
-            
-            // Notify the customer
-            if ($order->customer) {
-                $order->customer->notify(new OrderCreatedNotification($order));
-            }
-            
-            // Notify the authenticated user (admin/staff who created the order)
-            if (auth()->check()) {
-                auth()->user()->notify(new OrderCreatedNotification($order));
-            }
+            \App\Jobs\SendOrderCreatedNotifications::dispatch(
+                $order,
+                auth()->id()
+            );
         });
     }
 
@@ -66,68 +62,54 @@ class Order extends Model
         return $this->hasMany(OrderDocument::class);
     }
 
-    /**
-     * Calculate and update order total from items
-     */
     public function calculateTotal(): void
     {
         $this->total = $this->items()->sum('subtotal');
         $this->save();
     }
 
-    /**
-     * Check if order can be edited
-     */
     public function isEditable(): bool
     {
         return $this->status->isEditable();
     }
 
-    /**
-     * Check if order is in final state
-     */
     public function isFinal(): bool
     {
         return $this->status->isFinal();
     }
 
-    /**
-     * Transition to new status with validation
-     */
+    // handles status transitions with validation
+    // returns false if the transition isn't allowed by the OrderStatus enum
     public function transitionTo(OrderStatus $newStatus): bool
     {
         if (!$this->status->canTransitionTo($newStatus)) {
             return false;
         }
 
-        $oldStatus = $this->status;
+        $previousStatus = $this->status;
         $this->status = $newStatus;
-        $saved = $this->save();
+        $wasSuccessful = $this->save();
 
-        // Send notification after status change
-        if ($saved) {
+        if ($wasSuccessful) {
             $this->load('customer');
             
-            // Notify the customer
+            // notify customer about status change
             if ($this->customer) {
-                $this->customer->notify(new OrderStatusChangedNotification($this, $oldStatus, $newStatus));
+                $this->customer->notify(new OrderStatusChangedNotification($this, $previousStatus, $newStatus));
             }
             
-            // Notify the authenticated user (admin/staff who changed the status)
+            // notify the person who changed it too
             if (auth()->check()) {
-                auth()->user()->notify(new OrderStatusChangedNotification($this, $oldStatus, $newStatus));
+                auth()->user()->notify(new OrderStatusChangedNotification($this, $previousStatus, $newStatus));
             }
         }
 
-        return $saved;
+        return $wasSuccessful;
     }
 
-    /**
-     * Get allowed next statuses
-     */
     public function allowedNextStatuses(): array
     {
-        return OrderStatus::getValidTransitions($this->status);
+        return $this->status->allowedTransitions();
     }
 
     protected function getSearchableFields(): array
@@ -140,3 +122,4 @@ class Order extends Model
         return $query->where('status', $status);
     }
 }
+

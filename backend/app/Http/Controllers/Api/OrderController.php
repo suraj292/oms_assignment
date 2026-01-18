@@ -15,53 +15,46 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends BaseApiController
 {
-    /**
-     * Display a listing of orders
-     */
     public function index(Request $request)
     {
-        $query = Order::with(['customer', 'items']);
+        $ordersQuery = Order::with(['customer', 'items']);
 
-        // Search
         if ($request->has('search')) {
-            $query->search($request->search);
+            $ordersQuery->search($request->search);
         }
 
-        // Filter by status
         if ($request->has('status')) {
-            $query->byStatus($request->status);
+            $ordersQuery->byStatus($request->status);
         }
 
-        // Filter by customer
         if ($request->has('customer_id')) {
-            $query->where('customer_id', $request->customer_id);
+            $ordersQuery->where('customer_id', $request->customer_id);
         }
 
-        $orders = $query->latest()->paginate($request->get('per_page', 15));
+        $paginatedOrders = $ordersQuery->latest()->paginate($request->get('per_page', 15));
 
-        return OrderResource::collection($orders);
+        return OrderResource::collection($paginatedOrders);
     }
 
-    /**
-     * Store a newly created order
-     */
     public function store(StoreOrderRequest $request)
     {
         try {
             DB::beginTransaction();
 
-            $order = Order::create([
+            $newOrder = Order::create([
                 'customer_id' => $request->customer_id,
                 'notes' => $request->notes,
                 'status' => OrderStatus::DRAFT,
             ]);
 
-            // Add items
+            // create order items from the products
             foreach ($request->items as $itemData) {
                 $product = Product::findOrFail($itemData['product_id']);
                 
+                // we store product name and price at order time so we have a snapshot
+                // even if the product changes later
                 OrderItem::create([
-                    'order_id' => $order->id,
+                    'order_id' => $newOrder->id,
                     'product_id' => $product->id,
                     'product_name' => $product->name,
                     'price' => $product->price,
@@ -69,12 +62,12 @@ class OrderController extends BaseApiController
                 ]);
             }
 
-            $order->load(['customer', 'items']);
+            $newOrder->load(['customer', 'items']);
 
             DB::commit();
 
             return $this->successResponse(
-                new OrderResource($order),
+                new OrderResource($newOrder),
                 'Order created successfully',
                 201
             );
@@ -84,18 +77,12 @@ class OrderController extends BaseApiController
         }
     }
 
-    /**
-     * Display the specified order
-     */
     public function show(Order $order)
     {
-        $order->load(['customer', 'items.product']);
+        $order->load(['customer', 'items', 'documents']);
         return $this->successResponse(new OrderResource($order));
     }
 
-    /**
-     * Update the specified order
-     */
     public function update(UpdateOrderRequest $request, Order $order)
     {
         try {
@@ -106,12 +93,11 @@ class OrderController extends BaseApiController
                 'notes' => $request->notes ?? $order->notes,
             ]);
 
-            // Update items if provided
+            // if items are being updated, we just delete all old ones and recreate them
+            // simpler than trying to diff and update individual items
             if ($request->has('items')) {
-                // Delete existing items
                 $order->items()->delete();
 
-                // Add new items
                 foreach ($request->items as $itemData) {
                     $product = Product::findOrFail($itemData['product_id']);
                     
@@ -139,13 +125,11 @@ class OrderController extends BaseApiController
         }
     }
 
-    /**
-     * Update order status
-     */
     public function updateStatus(UpdateOrderStatusRequest $request, Order $order)
     {
         $newStatus = OrderStatus::from($request->status);
 
+        // the Order model handles validation and notifications
         if ($order->transitionTo($newStatus)) {
             $order->load(['customer', 'items']);
             
@@ -158,12 +142,9 @@ class OrderController extends BaseApiController
         return $this->errorResponse('Invalid status transition', 422);
     }
 
-    /**
-     * Remove the specified order
-     */
     public function destroy(Order $order)
     {
-        // Only allow deleting draft orders
+        // we only let people delete draft orders, otherwise it messes up reporting
         if (!$order->isEditable()) {
             return $this->errorResponse('Only draft orders can be deleted', 403);
         }

@@ -31,14 +31,14 @@
       </div>
     </template>
 
-    <LoadingSpinner v-if="loading" message="Loading orders..." />
+    <LoadingSpinner v-if="isLoadingOrders" message="Loading orders..." />
 
-    <div v-else-if="error" class="alert alert-error">
-      {{ error }}
+    <div v-else-if="errorMessage" class="alert alert-error">
+      {{ errorMessage }}
     </div>
 
     <EmptyState
-      v-else-if="orders.length === 0"
+      v-else-if="ordersList.length === 0"
       icon="📋"
       title="No orders found"
       message="Start by creating your first order."
@@ -65,7 +65,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="order in orders" :key="order.id">
+            <tr v-for="order in ordersList" :key="order.id">
               <td>
                 <router-link :to="`/orders/${order.id}`" class="order-number">
                   {{ order.order_number }}
@@ -115,21 +115,21 @@
         </table>
       </div>
 
-      <div v-if="pagination" class="pagination">
+      <div v-if="paginationData" class="pagination">
         <button
-          @click="changePage(pagination.current_page - 1)"
-          :disabled="pagination.current_page === 1"
+          @click="changePage(paginationData.current_page - 1)"
+          :disabled="paginationData.current_page === 1"
           class="btn btn-secondary"
         >
           ← Previous
         </button>
         <span class="pagination-info">
-          Page {{ pagination.current_page }} of {{ pagination.last_page }}
-          <span class="pagination-total">({{ pagination.total }} total)</span>
+          Page {{ paginationData.current_page }} of {{ paginationData.last_page }}
+          <span class="pagination-total">({{ paginationData.total }} total)</span>
         </span>
         <button
-          @click="changePage(pagination.current_page + 1)"
-          :disabled="pagination.current_page === pagination.last_page"
+          @click="changePage(paginationData.current_page + 1)"
+          :disabled="paginationData.current_page === paginationData.last_page"
           class="btn btn-secondary"
         >
           Next →
@@ -152,66 +152,68 @@ import EmptyState from '@/components/common/EmptyState.vue'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const orders = ref<Order[]>([])
-const loading = ref(false)
-const error = ref('')
+const ordersList = ref<Order[]>([])
+const isLoadingOrders = ref(false)
+const errorMessage = ref('')
 const searchQuery = ref('')
 const statusFilter = ref('')
-const pagination = ref<PaginationMeta | null>(null)
+const paginationData = ref<PaginationMeta | null>(null)
 
-let searchTimeout: number
+let searchDebounceTimer: number
 
 const debouncedSearch = () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
+  clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
     fetchOrders()
   }, 500)
 }
 
 async function fetchOrders(page = 1) {
-  loading.value = true
-  error.value = ''
+  isLoadingOrders.value = true
+  errorMessage.value = ''
 
   try {
-    const params: any = { page, per_page: 15 }
-    if (searchQuery.value) params.search = searchQuery.value
-    if (statusFilter.value) params.status = statusFilter.value
+    const queryParams: any = { page, per_page: 15 }
+    if (searchQuery.value) queryParams.search = searchQuery.value
+    if (statusFilter.value) queryParams.status = statusFilter.value
 
-    const response = await ordersAPI.getAll(params)
-    orders.value = response.data.data
-    pagination.value = response.data.meta
+    const apiResponse = await ordersAPI.getAll(queryParams)
+    ordersList.value = apiResponse.data.data
+    paginationData.value = apiResponse.data.meta
   } catch (err: any) {
-    error.value = err.response?.data?.message || 'Failed to load orders'
+    errorMessage.value = err.response?.data?.message || 'Failed to load orders'
   } finally {
-    loading.value = false
+    isLoadingOrders.value = false
   }
 }
 
-function changePage(page: number) {
-  fetchOrders(page)
+function changePage(pageNumber: number) {
+  fetchOrders(pageNumber)
 }
 
-function viewOrder(id: number) {
-  router.push(`/orders/${id}`)
+function viewOrder(orderId: number) {
+  router.push(`/orders/${orderId}`)
 }
 
-function editOrder(id: number) {
-  router.push(`/orders/${id}/edit`)
+function editOrder(orderId: number) {
+  router.push(`/orders/${orderId}/edit`)
 }
 
-async function deleteOrder(id: number) {
+async function deleteOrder(orderId: number) {
+  // simple confirmation for now, might want a nicer modal later
   if (!confirm('Are you sure you want to delete this order?')) return
 
   try {
-    await ordersAPI.delete(id)
+    await ordersAPI.delete(orderId)
     fetchOrders()
   } catch (err: any) {
     alert(err.response?.data?.message || 'Failed to delete order')
   }
 }
 
+// badge colors for different order statuses
 function getStatusBadgeClass(status: OrderStatus): string {
-  const classes: Record<OrderStatus, string> = {
+  const statusColors: Record<OrderStatus, string> = {
     draft: 'badge-warning',
     confirmed: 'badge-info',
     processing: 'badge-info',
@@ -219,7 +221,7 @@ function getStatusBadgeClass(status: OrderStatus): string {
     delivered: 'badge-success',
     cancelled: 'badge-danger',
   }
-  return classes[status] || 'badge-info'
+  return statusColors[status] || 'badge-info'
 }
 
 function formatDate(dateString: string): string {

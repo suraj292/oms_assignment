@@ -27,3 +27,4 @@ class Customer extends Model
         return ['name', 'email', 'phone'];
     }
 }
+

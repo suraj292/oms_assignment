@@ -20,6 +20,8 @@ class OrderDocument extends Model
         'file_size' => 'integer',
     ];
 
+    protected $appends = ['url'];
+
     public function order()
     {
         return $this->belongsTo(Order::class);

@@ -132,14 +132,49 @@
           <h3>Upload Documents</h3>
         </div>
         <div class="card-body">
+          <!-- Success Message -->
+          <div v-if="uploadSuccess" class="alert alert-success upload-success">
+            ✓ Document uploaded successfully!
+          </div>
+          
+          <!-- Show upload component only if no documents exist -->
           <ChunkedFileUpload
+            v-if="!order.documents || order.documents.length === 0"
             target-type="order_document"
             :target-id="order.id"
-            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.csv"
             button-text="Upload Document"
             @upload-complete="handleUploadComplete"
             @upload-error="handleUploadError"
           />
+
+          <!-- Uploaded Documents List -->
+          <div v-if="order.documents && order.documents.length > 0" class="documents-list">
+            <h4 class="documents-title">Uploaded Documents ({{ order.documents.length }})</h4>
+            <div class="documents-grid">
+              <div v-for="doc in order.documents" :key="doc.id" class="document-item">
+                <div class="document-icon">
+                  📄
+                </div>
+                <div class="document-info">
+                  <a :href="doc.url" target="_blank" class="document-name" :title="doc.original_name">
+                    {{ doc.original_name }}
+                  </a>
+                  <div class="document-meta">
+                    <span class="document-size">{{ formatFileSize(doc.file_size) }}</span>
+                    <span class="document-date">{{ formatDate(doc.created_at) }}</span>
+                  </div>
+                </div>
+                <div class="document-actions">
+                  <a :href="doc.url" download class="btn btn-sm btn-primary">
+                    Download
+                  </a>
+                  <button @click.prevent.stop="deleteDocument(doc.id)" class="btn btn-sm btn-danger" title="Delete document">
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -161,6 +196,7 @@ const order = ref<Order | null>(null)
 const loading = ref(false)
 const error = ref('')
 const updatingStatus = ref(false)
+const uploadSuccess = ref(false)
 
 const orderId = Number(route.params.id)
 
@@ -217,7 +253,13 @@ function formatDate(dateString: string): string {
 }
 
 function handleUploadComplete() {
+  uploadSuccess.value = true
   loadOrder()
+  
+  // Auto-dismiss success message after 5 seconds
+  setTimeout(() => {
+    uploadSuccess.value = false
+  }, 5000)
 }
 
 function handleUploadError(error: Error) {
@@ -225,8 +267,55 @@ function handleUploadError(error: Error) {
   alert('Failed to upload file: ' + error.message)
 }
 
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+}
+
+async function deleteDocument(documentId: number) {
+  // Use native browser confirmation
+  const confirmed = window.confirm('Are you sure you want to delete this document? This action cannot be undone.')
+  
+  if (!confirmed) {
+    return
+  }
+
+  try {
+    const token = localStorage.getItem('auth_token')
+    
+    const response = await fetch(`/api/orders/${order.value?.id}/documents/${documentId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+      },
+      credentials: 'include',
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.message || 'Failed to delete document')
+    }
+    
+    // Reload order to refresh documents list
+    await loadOrder()
+  } catch (err: any) {
+    console.error('Delete error:', err)
+    alert('Failed to delete document: ' + (err.message || 'Unknown error'))
+  }
+}
+
 onMounted(() => {
   loadOrder()
+  
+  // Initialize Lucide icons
+  if (window.lucide) {
+    window.lucide.createIcons()
+  }
 })
 </script>
 
@@ -348,6 +437,107 @@ onMounted(() => {
   white-space: pre-wrap;
 }
 
+.upload-success {
+  margin-bottom: 1rem;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Documents List */
+.documents-list {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--color-gray-200);
+}
+
+.documents-title {
+  margin: 0 0 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-gray-700);
+}
+
+.documents-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.document-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--color-gray-50);
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  transition: all 0.2s;
+}
+
+.document-item:hover {
+  background: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.document-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.document-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.document-name {
+  display: block;
+  font-weight: 500;
+  color: var(--color-gray-900);
+  text-decoration: none;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.document-name:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.document-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.8125rem;
+  color: var(--color-gray-500);
+}
+
+.document-size::after {
+  content: '•';
+  margin-left: 1rem;
+}
+
+.document-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.document-actions .icon-sm {
+  width: 16px;
+  height: 16px;
+}
+
 @media (max-width: 768px) {
   .status-header {
     flex-direction: column;
@@ -355,6 +545,14 @@ onMounted(() => {
 
   .info-grid {
     grid-template-columns: 1fr;
+  }
+
+  .document-item {
+    flex-wrap: wrap;
+  }
+
+  .document-actions {
+    width: 100%;
   }
 }
 </style>

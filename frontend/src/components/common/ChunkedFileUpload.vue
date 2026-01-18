@@ -1,6 +1,42 @@
 <template>
   <div class="chunked-file-upload">
-    <div v-if="status === 'idle'" class="upload-idle">
+    <!-- Resumable Upload Prompt -->
+    <div v-if="resumableUpload && status === 'idle'" class="resumable-upload-prompt">
+      <div class="prompt-content">
+        <div class="prompt-icon">⏸️</div>
+        <div class="prompt-text">
+          <h4>Resume Previous Upload?</h4>
+          <p>{{ resumableUpload.fileName }} ({{ Math.round(resumableUpload.uploadedChunks.length / resumableUpload.totalChunks * 100) }}% uploaded)</p>
+          <p class="prompt-hint">You'll need to select the same file to continue</p>
+        </div>
+      </div>
+      <div class="prompt-actions">
+        <button @click="resumePreviousUpload" class="btn btn-primary">
+          Resume Upload
+        </button>
+        <button @click="discardPreviousUpload" class="btn btn-secondary">
+          Discard & Upload New
+        </button>
+      </div>
+    </div>
+
+    <!-- Completed Upload Display -->
+    <div v-else-if="status === 'completed' && completedFileUrl" class="upload-completed">
+      <div class="completed-icon">✓</div>
+      <div class="completed-info">
+        <div class="completed-filename">{{ selectedFile?.name }}</div>
+        <div class="completed-meta">
+          <span class="completed-size">{{ formatFileSize(selectedFile?.size || 0) }}</span>
+          <span class="completed-status">Upload complete</span>
+        </div>
+      </div>
+      <a :href="completedFileUrl" download class="btn btn-primary">
+        Download
+      </a>
+    </div>
+
+    <!-- Upload Idle State -->
+    <div v-else-if="status === 'idle'" class="upload-idle">
       <input
         ref="fileInput"
         type="file"
@@ -16,6 +52,7 @@
       </p>
     </div>
 
+    <!-- Upload Progress -->
     <div v-else class="upload-progress-container">
       <div class="upload-info">
         <div class="file-name">{{ selectedFile?.name }}</div>
@@ -61,21 +98,14 @@
         >
           Cancel
         </button>
-        <button
-          v-if="status === 'completed' || status === 'cancelled'"
-          @click="reset"
-          class="btn btn-secondary"
-        >
-          Upload Another
-        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { ChunkedUploadManager, type UploadStatus, type UploadProgress } from '@/services/chunkedUploadService'
+import { ref, computed, onMounted } from 'vue'
+import { ChunkedUploadManager, type UploadStatus, type UploadProgress, type UploadState } from '@/services/chunkedUploadService'
 import { formatFileSize } from '@/utils/fileChunker'
 
 interface Props {
@@ -112,6 +142,8 @@ const progress = ref<UploadProgress>({
   totalBytes: 0,
 })
 const error = ref<string>('')
+const resumableUpload = ref<UploadState | null>(null)
+const completedFileUrl = ref<string>('')
 
 const statusClass = computed(() => {
   return {
@@ -177,6 +209,7 @@ function startUpload(file: File) {
   }
 
   uploadManager.value.onComplete = (url) => {
+    completedFileUrl.value = url
     emit('upload-complete', url)
   }
 
@@ -185,7 +218,16 @@ function startUpload(file: File) {
     emit('upload-error', err)
   }
 
-  uploadManager.value.start()
+  // Check if this is a resumed upload (status will be 'paused' from restored state)
+  const currentStatus = uploadManager.value.getStatus()
+  
+  if (currentStatus === 'paused' || currentStatus === 'cancelled') {
+    // Don't auto-start, wait for user to click Resume
+    // The status is already set from restoreState()
+  } else {
+    // New upload - start immediately
+    uploadManager.value.start()
+  }
 }
 
 function pauseUpload() {
@@ -213,10 +255,89 @@ function reset() {
     totalBytes: 0,
   }
   error.value = ''
+  resumableUpload.value = null
+  
+  // Check for new resumable uploads after reset
+  checkForResumableUpload()
   if (fileInput.value) {
     fileInput.value.value = ''
   }
 }
+
+// Check for resumable uploads on mount
+function checkForResumableUpload() {
+  // Check all possible resumable uploads in localStorage
+  const keys = Object.keys(localStorage)
+  const uploadKey = keys.find(key => 
+    key.startsWith(`chunked_upload_${props.targetType}_${props.targetId}_`)
+  )
+  
+  if (uploadKey) {
+    const fileName = uploadKey.replace(`chunked_upload_${props.targetType}_${props.targetId}_`, '')
+    const uploadInfo = ChunkedUploadManager.getResumableUploadInfo(fileName, props.targetType, props.targetId)
+    
+    if (uploadInfo && (uploadInfo.status === 'paused' || uploadInfo.status === 'cancelled')) {
+      resumableUpload.value = uploadInfo
+    }
+  }
+}
+
+// Resume previous upload
+async function resumePreviousUpload() {
+  if (!resumableUpload.value) return
+  
+  // Trigger file selection - user must select the same file
+  fileInput.value?.click()
+  
+  // Store resumable upload info temporarily
+  const tempResumableUpload = resumableUpload.value
+  resumableUpload.value = null
+  
+  // Wait for file selection
+  const handleResumeFileSelect = (event: Event) => {
+    const target = event.target as HTMLInputElement
+    const file = target.files?.[0]
+    
+    if (!file) {
+      // User cancelled - restore resume prompt
+      resumableUpload.value = tempResumableUpload
+      return
+    }
+    
+    // Validate file matches
+    if (file.name !== tempResumableUpload.fileName || file.size !== tempResumableUpload.fileSize) {
+      error.value = `Please select the same file: ${tempResumableUpload.fileName} (${formatFileSize(tempResumableUpload.fileSize)})`
+      resumableUpload.value = tempResumableUpload
+      return
+    }
+    
+    // File matches - start upload (will auto-restore state)
+    selectedFile.value = file
+    error.value = ''
+    startUpload(file)
+    
+    // Remove this one-time listener
+    fileInput.value?.removeEventListener('change', handleResumeFileSelect)
+  }
+  
+  // Add one-time listener for file selection
+  fileInput.value?.addEventListener('change', handleResumeFileSelect, { once: true })
+}
+
+// Discard previous upload
+function discardPreviousUpload() {
+  if (!resumableUpload.value) return
+  
+  // Clear the saved state
+  const storageKey = `chunked_upload_${props.targetType}_${props.targetId}_${resumableUpload.value.fileName}`
+  localStorage.removeItem(storageKey)
+  
+  resumableUpload.value = null
+}
+
+onMounted(() => {
+  checkForResumableUpload()
+})
 </script>
 
 <style scoped>
@@ -323,8 +444,101 @@ function reset() {
 }
 
 .status-cancelled {
-  background: var(--color-gray-200);
-  color: var(--color-gray-700);
+  background: var(--color-gray-100);
+  color: var(--color-gray-600);
+}
+
+/* Resumable Upload Prompt */
+.resumable-upload-prompt {
+  border: 2px dashed var(--color-primary);
+  border-radius: var(--radius-lg);
+  padding: 2rem;
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.prompt-content {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.prompt-icon {
+  font-size: 3rem;
+}
+
+.prompt-text h4 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-gray-900);
+}
+
+.prompt-text p {
+  margin: 0;
+  color: var(--color-gray-600);
+  font-size: 0.9375rem;
+}
+
+.prompt-hint {
+  font-size: 0.8125rem !important;
+  color: var(--color-gray-500) !important;
+  font-style: italic;
+  margin-top: 0.25rem !important;
+}
+
+.prompt-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+/* Completed Upload Display */
+.upload-completed {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: #f0fdf4;
+  border: 2px solid #86efac;
+  border-radius: var(--radius-lg);
+}
+
+.completed-icon {
+  font-size: 2.5rem;
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+.completed-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.completed-filename {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--color-gray-900);
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.completed-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: var(--color-gray-600);
+}
+
+.completed-size::after {
+  content: '•';
+  margin-left: 1rem;
+}
+
+.completed-status {
+  color: var(--color-success);
+  font-weight: 500;
 }
 
 .error-message {

@@ -25,6 +25,9 @@ class OrderResource extends JsonResource
             'notes' => $this->notes,
             'items' => OrderItemResource::collection($this->whenLoaded('items')),
             'items_count' => $this->items->count() ?? 0,
+            'documents' => $this->when($this->relationLoaded('documents'), function() {
+                return $this->getRelation('documents');
+            }),
             'is_editable' => $this->isEditable(),
             'is_final' => $this->isFinal(),
             'allowed_next_statuses' => array_map(

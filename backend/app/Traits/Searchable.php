@@ -4,46 +4,36 @@ namespace App\Traits;
 
 trait Searchable
 {
-    /**
-     * Scope a query to search across multiple fields with multi-word support.
-     * All words must match at least one field for the record to be included.
-     *
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string|null $searchTerm
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
+    // this handles multi-word search across whatever fields the model defines
+    // basically splits the search term into words and makes sure ALL words match somewhere
+    // e.g. "john doe" will only return results that have both "john" AND "doe" in at least one field
     public function scopeSearch($query, $searchTerm)
     {
-        // Return early if search term is empty
         if (empty(trim($searchTerm))) {
             return $query;
         }
 
-        // Split search term into individual words and remove empty strings
-        $words = array_filter(
+        // split by spaces and filter out empty strings
+        $searchWords = array_filter(
             explode(' ', trim($searchTerm)),
             function ($word) {
                 return !empty(trim($word));
             }
         );
 
-        // If no valid words after filtering, return query unchanged
-        if (empty($words)) {
+        if (empty($searchWords)) {
             return $query;
         }
 
-        // Get the searchable fields defined in the model
-        $fields = $this->getSearchableFields();
+        $searchableFields = $this->getSearchableFields();
 
-        // Apply search logic: each word must match at least one field
-        return $query->where(function ($q) use ($words, $fields) {
-            foreach ($words as $word) {
+        // for each word, it must match at least one field (AND between words, OR between fields)
+        return $query->where(function ($q) use ($searchWords, $searchableFields) {
+            foreach ($searchWords as $word) {
                 $word = trim($word);
                 
-                // Each word must match at least one field (AND logic between words)
-                $q->where(function ($subQuery) use ($word, $fields) {
-                    foreach ($fields as $field) {
-                        // Word can match any field (OR logic between fields)
+                $q->where(function ($subQuery) use ($word, $searchableFields) {
+                    foreach ($searchableFields as $field) {
                         $subQuery->orWhere($field, 'LIKE', "%{$word}%");
                     }
                 });
@@ -51,11 +41,7 @@ trait Searchable
         });
     }
 
-    /**
-     * Get the fields that should be searched.
-     * Must be implemented by the model using this trait.
-     *
-     * @return array
-     */
+    // each model needs to define which fields can be searched
     abstract protected function getSearchableFields(): array;
 }
+

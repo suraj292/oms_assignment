@@ -11,6 +11,20 @@ export interface UploadProgress {
     totalBytes: number
 }
 
+export interface UploadState {
+    uploadId: string
+    fileName: string
+    fileSize: number
+    fileType: string
+    totalChunks: number
+    uploadedChunks: number[]
+    targetType: string
+    targetId: number
+    chunkSize: number
+    status: UploadStatus
+    timestamp: number
+}
+
 export class ChunkedUploadManager {
     private file: File
     private uploadId: string | null = null
@@ -20,6 +34,7 @@ export class ChunkedUploadManager {
     private status: UploadStatus = 'idle'
     private targetType: string
     private targetId: number
+    private storageKey: string
 
     // Callbacks
     public onProgress?: (progress: UploadProgress) => void
@@ -38,6 +53,10 @@ export class ChunkedUploadManager {
         this.targetId = targetId
         this.chunkSize = chunkSize
         this.chunks = chunkFile(file, chunkSize)
+        this.storageKey = `chunked_upload_${targetType}_${targetId}_${file.name}`
+
+        // Try to restore previous upload state
+        this.restoreState()
     }
 
     /**
@@ -45,26 +64,34 @@ export class ChunkedUploadManager {
      */
     async start(): Promise<void> {
         try {
-            this.setStatus('initializing')
+            // If we have an uploadId from restored state, skip initialization
+            if (!this.uploadId) {
+                this.setStatus('initializing')
 
-            // Initialize upload session
-            const initResponse = await chunkedUploadsAPI.initialize(
-                this.file.name,
-                this.chunks.length,
-                this.file.size
-            )
+                // Initialize upload session
+                const initResponse = await chunkedUploadsAPI.initialize(
+                    this.file.name,
+                    this.chunks.length,
+                    this.file.size
+                )
 
-            this.uploadId = initResponse.data.data.upload_id
+                this.uploadId = initResponse.data.data.upload_id
 
-            // Check if there are already uploaded chunks (resume)
-            await this.checkExistingChunks()
+                // Check if there are already uploaded chunks (resume)
+                await this.checkExistingChunks()
+            } else {
+                // Resuming from saved state - just check existing chunks
+                await this.checkExistingChunks()
+            }
 
             // Start uploading
             this.setStatus('uploading')
             await this.uploadRemainingChunks()
 
-            // Complete upload
-            await this.completeUpload()
+            // Only complete if not paused or cancelled
+            if (this.status !== 'paused' && this.status !== 'cancelled') {
+                await this.completeUpload()
+            }
 
         } catch (error) {
             this.setStatus('error')
@@ -86,6 +113,7 @@ export class ChunkedUploadManager {
         })
 
         this.updateProgress()
+        this.saveState() // Save state after checking existing chunks
     }
 
     /**
@@ -102,6 +130,7 @@ export class ChunkedUploadManager {
             }
 
             await this.uploadChunkWithRetry(i)
+            this.saveState() // Save state after each chunk
         }
     }
 
@@ -148,6 +177,7 @@ export class ChunkedUploadManager {
         )
 
         this.setStatus('completed')
+        this.clearState() // Clear state after successful completion
         this.onComplete?.(completeResponse.data.data.url)
     }
 
@@ -157,6 +187,7 @@ export class ChunkedUploadManager {
     pause(): void {
         if (this.status === 'uploading') {
             this.setStatus('paused')
+            this.saveState() // Save state when paused
         }
     }
 
@@ -167,7 +198,11 @@ export class ChunkedUploadManager {
         if (this.status === 'paused') {
             this.setStatus('uploading')
             await this.uploadRemainingChunks()
-            await this.completeUpload()
+
+            // Only complete if not paused or cancelled again
+            if (this.status !== 'paused' && this.status !== 'cancelled') {
+                await this.completeUpload()
+            }
         }
     }
 
@@ -176,6 +211,7 @@ export class ChunkedUploadManager {
      */
     async cancel(): Promise<void> {
         this.setStatus('cancelled')
+        this.saveState() // Save cancelled state so user can resume later
 
         if (this.uploadId) {
             try {
@@ -232,5 +268,102 @@ export class ChunkedUploadManager {
      */
     private sleep(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms))
+    }
+
+    /**
+     * Save upload state to localStorage
+     */
+    private saveState(): void {
+        if (!this.uploadId) return
+
+        const state: UploadState = {
+            uploadId: this.uploadId,
+            fileName: this.file.name,
+            fileSize: this.file.size,
+            fileType: this.file.type,
+            totalChunks: this.chunks.length,
+            uploadedChunks: Array.from(this.uploadedChunks),
+            targetType: this.targetType,
+            targetId: this.targetId,
+            chunkSize: this.chunkSize,
+            status: this.status,
+            timestamp: Date.now()
+        }
+
+        try {
+            localStorage.setItem(this.storageKey, JSON.stringify(state))
+        } catch (error) {
+            console.error('Failed to save upload state:', error)
+        }
+    }
+
+    /**
+     * Restore upload state from localStorage
+     */
+    private restoreState(): void {
+        try {
+            const savedState = localStorage.getItem(this.storageKey)
+            if (!savedState) return
+
+            const state: UploadState = JSON.parse(savedState)
+
+            // Only restore if file matches and upload was in progress
+            if (
+                state.fileName === this.file.name &&
+                state.fileSize === this.file.size &&
+                (state.status === 'paused' || state.status === 'cancelled' || state.status === 'uploading')
+            ) {
+                this.uploadId = state.uploadId
+                this.uploadedChunks = new Set(state.uploadedChunks)
+                this.setStatus(state.status === 'uploading' ? 'paused' : state.status)
+                this.updateProgress()
+            }
+        } catch (error) {
+            console.error('Failed to restore upload state:', error)
+        }
+    }
+
+    /**
+     * Clear upload state from localStorage
+     */
+    private clearState(): void {
+        try {
+            localStorage.removeItem(this.storageKey)
+        } catch (error) {
+            console.error('Failed to clear upload state:', error)
+        }
+    }
+
+    /**
+     * Check if there's a resumable upload for this file
+     */
+    static hasResumableUpload(fileName: string, targetType: string, targetId: number): boolean {
+        const storageKey = `chunked_upload_${targetType}_${targetId}_${fileName}`
+        const savedState = localStorage.getItem(storageKey)
+
+        if (!savedState) return false
+
+        try {
+            const state: UploadState = JSON.parse(savedState)
+            return state.status === 'paused' || state.status === 'cancelled'
+        } catch {
+            return false
+        }
+    }
+
+    /**
+     * Get resumable upload info
+     */
+    static getResumableUploadInfo(fileName: string, targetType: string, targetId: number): UploadState | null {
+        const storageKey = `chunked_upload_${targetType}_${targetId}_${fileName}`
+        const savedState = localStorage.getItem(storageKey)
+
+        if (!savedState) return null
+
+        try {
+            return JSON.parse(savedState)
+        } catch {
+            return null
+        }
     }
 }
